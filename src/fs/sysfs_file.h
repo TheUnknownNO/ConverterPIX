@@ -13,8 +13,6 @@
 
 class SysFsFile : public File
 {
-private:
-	FILE *m_fp = nullptr;
 public:
 	SysFsFile();
 	SysFsFile(const SysFsFile &) = delete;
@@ -26,13 +24,14 @@ public:
 
 	virtual size_t write(const void *buffer, size_t elementSize, size_t elementCount) override;
 	virtual size_t read(void *buffer, size_t elementSize, size_t elementCount) override;
-
-	virtual size_t getSize() const override;
-	virtual const char *getLine(String &out) override;
-
-	virtual int seek(uint32_t offset, Attrib attr) override;
+	virtual size_t size() const override;
+	virtual bool seek(uint32_t offset, Attrib attr) override;
 	virtual void rewind() override;
 	virtual size_t tell() override;
+	virtual void flush() override;
+
+private:
+	FILE *m_fp = nullptr;
 
 	friend class SysFileSystem;
 };

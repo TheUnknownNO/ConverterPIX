@@ -15,6 +15,8 @@
     <ClInclude Include="config.h" />
     <ClInclude Include="fs\file.h" />
     <ClInclude Include="fs\filesystem.h" />
+    <ClInclude Include="fs\hashfilesystem.h" />
+    <ClInclude Include="fs\hashfs_file.h" />
     <ClInclude Include="fs\sysfilesystem.h" />
     <ClInclude Include="fs\sysfs_file.h" />
     <ClInclude Include="fs\uberfilesystem.h" />
@@ -46,6 +48,7 @@
     <ClInclude Include="prerequisites.h" />
     <ClInclude Include="resource_lib.h" />
     <ClInclude Include="structs\dds.h" />
+    <ClInclude Include="structs\hashfs.h" />
     <ClInclude Include="structs\pma.h" />
     <ClInclude Include="structs\pmc.h" />
     <ClInclude Include="structs\pmd.h" />
@@ -58,6 +61,7 @@
     <ClInclude Include="texture\texture_object.h" />
     <ClInclude Include="utils\explicit_singleton.h" />
     <ClInclude Include="utils\hash.h" />
+    <ClInclude Include="utils\string_tokenizer.h" />
     <ClInclude Include="utils\token.h" />
     <ClInclude Include="utils\types.h" />
     <ClInclude Include="version.h" />
@@ -67,14 +71,25 @@
     <ClCompile Include="config.cpp" />
     <ClCompile Include="fs\file.cpp" />
     <ClCompile Include="fs\filesystem.cpp" />
+    <ClCompile Include="fs\hashfilesystem.cpp" />
+    <ClCompile Include="fs\hashfs_file.cpp" />
     <ClCompile Include="fs\sysfilesystem.cpp" />
     <ClCompile Include="fs\sysfs_file.cpp" />
     <ClCompile Include="fs\uberfilesystem.cpp" />
     <ClCompile Include="fs\zipfilesystem.cpp" />
     <ClCompile Include="fs\zipfs_file.cpp" />
-    <ClCompile Include="libs\fmt\fmt\format.cc" />
-    <ClCompile Include="libs\fmt\fmt\ostream.cc" />
-    <ClCompile Include="libs\fmt\fmt\posix.cc" />
+    <ClCompile Include="libs\fmt\fmt\format.cc">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="libs\fmt\fmt\ostream.cc">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="libs\fmt\fmt\posix.cc">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="material\material.cpp" />
     <ClCompile Include="model\animation.cpp" />
     <ClCompile Include="model\collision.cpp" />
@@ -82,10 +97,15 @@
     <ClCompile Include="model\piece.cpp" />
     <ClCompile Include="pix\pix.cpp" />
     <ClCompile Include="prefab\prefab.cpp" />
+    <ClCompile Include="prerequisites.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="resource_lib.cpp" />
     <ClCompile Include="structs\dds.cpp" />
     <ClCompile Include="texture\texture.cpp" />
     <ClCompile Include="texture\texture_object.cpp" />
+    <ClCompile Include="utils\string_tokenizer.cpp" />
     <ClCompile Include="utils\token.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -99,7 +119,8 @@
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v140</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>NotSet</CharacterSet>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -125,14 +146,22 @@
     <IntDir>..\obj\release\win_x86\$(ProjectName)\</IntDir>
     <TargetName>core</TargetName>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>..\bin\win_x86\</OutDir>
+    <IntDir>..\obj\release\win_x86\$(ProjectName)\</IntDir>
+    <TargetName>core_d</TargetName>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
+      <PrecompiledHeaderFile>prerequisites.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>./;./libs;./libs/glm;./libs/fmt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <DisableSpecificWarnings>4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -141,9 +170,8 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
-      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -151,6 +179,7 @@
       <AdditionalIncludeDirectories>./;./libs;./libs/glm;./libs/fmt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <DisableSpecificWarnings>4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <PrecompiledHeaderFile>prerequisites.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

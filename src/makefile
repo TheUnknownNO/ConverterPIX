@@ -8,12 +8,15 @@ CXXSTANDARD=c++14
 CXXFLAGS=-c -g -w -O3 -Wall -msse -msse2 -fpermissive -std=$(CXXSTANDARD)
 
 INCLUDES=-I./
+INCLUDES+=-I./libs
 INCLUDES+=-I./libs/glm
 INCLUDES+=-I./libs/fmt
 
 LDFLAGS=-g
 
 LIBS=./libs/libs/libfmt.a
+LIBS+=./libs/libs/libcityhash.a
+LIBS+=./libs/libs/libzlib.a
 
 CXXSOURCE=$(wildcard *.cpp)
 CXXSOURCE+=$(wildcard fs/*.cpp)
@@ -25,6 +28,7 @@ CXXSOURCE+=$(wildcard structs/*.cpp)
 CXXSOURCE+=$(wildcard texture/*.cpp)
 CXXSOURCE+=$(wildcard utils/*.cpp)
 CXXSOURCE+=$(wildcard cmd/*.cpp)
+CXXSOURCE+=$(wildcard pix/*.cpp)
 
 CXXOBJECTS=$(CXXSOURCE:.cpp=.o)
 

@@ -13,21 +13,27 @@
 
 class UberFileSystem : public FileSystem
 {
-private:
-	std::map<int, UniquePtr<FileSystem>> m_filesystems;
+public:
+	using Priority = int;
+
 public:
 	UberFileSystem();
 	virtual ~UberFileSystem();
 
+	virtual String root() const override;
+	virtual String name() const override;
 	virtual UniquePtr<File> open(const String &filename, FsOpenMode mode) override;
 	virtual bool mkdir(const String &directory) override;
 	virtual bool rmdir(const String &directory) override;
 	virtual bool exists(const String &filename) override;
 	virtual bool dirExists(const String &dirpath) override;
-	virtual UniquePtr<List<String>> readDir(const String &path, bool absolutePaths, bool recursive) override;
+	virtual UniquePtr<List<Entry>> readDir(const String &path, bool absolutePaths, bool recursive) override;
 
-	FileSystem *mount(UniquePtr<FileSystem> fs, int priority);
+	FileSystem *mount(UniquePtr<FileSystem> fs, Priority priority);
 	void unmount(FileSystem *fs);
+
+private:
+	std::map<Priority, UniquePtr<FileSystem>> m_filesystems;
 };
 
 /* eof */

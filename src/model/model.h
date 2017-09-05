@@ -18,10 +18,11 @@
 
 class Look
 {
-	friend Model;
 private:
 	String m_name;
 	Array<Material> m_materials;
+
+	friend Model;
 };
 
 class Variant
@@ -39,6 +40,7 @@ public:
 			int m_intValue;
 			float m_floatValue;
 		};
+
 	public:
 		Attribute(String name) : m_name(name) {}
 
@@ -50,10 +52,16 @@ public:
 		*/
 		String toDefinition(const String &prefix = "") const;
 
+		/**
+		 * @brief 
+		 */
+		Pix::Value toPixDefinition() const;
+
 		String getName() const { return m_name; }
 		int getInt() const { return m_intValue; }
 		float getFloat() const { return m_floatValue; }
 	};
+
 	class Part
 	{
 		friend Variant;
@@ -61,6 +69,7 @@ public:
 
 		const ::Part *m_part = nullptr;
 		Array<Attribute> m_attributes;
+
 	public:
 		const Attribute &operator[](String attribute) const;
 		const Attribute &operator[](size_t attribute) const;
@@ -69,9 +78,11 @@ public:
 
 		const ::Part *part() const { return m_part; }
 	};
+
 private:
 	String m_name;
 	Array<Part> m_parts;
+
 public:
 	void setPartCount(size_t parts);
 	const Part &operator[](size_t id) const;
@@ -99,20 +110,25 @@ private:
 	uint32_t m_skinVertCount = 0;
 	uint32_t m_materialCount = 0;
 
-	SharedPtr<Prefab> m_prefab;
-	SharedPtr<Collision> m_collision;
+	UniquePtr<Prefab> m_prefab;
+	UniquePtr<Collision> m_collision;
 
 	bool m_loaded = false;
 
 	String m_filePath;		// @example /vehicle/truck/man_tgx/interior/anim
 	String m_fileName;		// @example anim
-	String m_directory;	// @example /vehicle/truck/man_tgx/interior
+	String m_directory;		// @example /vehicle/truck/man_tgx/interior
+
 public:
+	Model();
+	~Model();
+
 	bool load(String filePath);
 	void destroy();
 
 	bool loadModel();
 	bool loadDescriptor();
+	bool loadPrefab();
 	bool loadCollision();
 
 	bool saveToPim(String exportPath) const;
@@ -132,6 +148,7 @@ public:
 	const Array<Part> &getParts() const { return m_parts; }
 	const Array<Variant> &getVariants() const { return m_variants; }
 
+private:
 	bool loadModel0x13(const uint8_t *const buffer, const size_t size);
 	bool loadModel0x14(const uint8_t *const buffer, const size_t size);
 };

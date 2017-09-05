@@ -34,7 +34,7 @@ void Material::Attribute::clear()
 	m_value = 0.f;
 }
 
-const char *Material::Attribute::getFormat() const
+String Material::Attribute::getFormat() const
 {
 	if (m_valueType == STRING)
 	{
@@ -67,11 +67,11 @@ bool Material::load(String filePath)
 	auto file = getUFS()->open(m_filePath, FileSystem::read | FileSystem::binary);
 	if(!file)
 	{
-		error_f("material", m_filePath, "Unable to open material (%s)!", strerror(errno));
+		warning_f("material", m_filePath, "Unable to open material!");
 		return false;
 	}
 
-	size_t fileSize = file->getSize();
+	size_t fileSize = file->size();
 
 	uint8_t *buff = new uint8_t[fileSize + 1]; // +1 for null terminator
 	file->read((char *)buff, sizeof(uint8_t), fileSize);
@@ -84,14 +84,14 @@ bool Material::load(String filePath)
 	size_t begin_material = buffer.find(':'); // material : "effect" { }
 	if (begin_material == String::npos)
 	{
-		error("material", m_filePath, "Unable to find \':\' in material!");
+		warning("material", m_filePath, "Unable to find \':\' in material!");
 		return false;
 	}
 
 	String check_mat = removeSpaces(buffer.substr(0, begin_material));
 	if (check_mat != "material")
 	{
-		error("material", m_filePath, "Invalid material format!");
+		warning("material", m_filePath, "Invalid material format!");
 		return false;
 	}
 
@@ -100,20 +100,20 @@ bool Material::load(String filePath)
 	size_t brace_left = buffer.find('{');
 	if (brace_left == String::npos)
 	{
-		error("material", m_filePath, "Unable to find left brace!");
+		warning("material", m_filePath, "Unable to find left brace!");
 		return false;
 	}
 	size_t brace_right = buffer.rfind('}');
 	if (brace_right == String::npos)
 	{
-		error("material", m_filePath, "Unable to find right brace!");
+		warning("material", m_filePath, "Unable to find right brace!");
 		return false;
 	}
 
 	String effect = betweenQuotes(removeSpaces(buffer.substr(0, brace_left - 1)));
 	if (effect == "ERROR")
 	{
-		error("material", m_filePath, "Quotes effect error!");
+		warning("material", m_filePath, "Quotes effect error!");
 		return false;
 	}
 
@@ -125,7 +125,7 @@ bool Material::load(String filePath)
 	buffer = buffer.substr(brace_left + 1, brace_right - brace_left - 1);
 
 	std::stringstream ssbuffer(buffer);
-	
+
 	while (std::getline(ssbuffer, buffer))
 	{
 		size_t middle = buffer.find(':');
@@ -145,7 +145,7 @@ bool Material::load(String filePath)
 				size_t braceRight = value.find('}');
 				if (braceRight == String::npos)
 				{
-					error("material", m_filePath, "Unable to find closing brace!");
+					warning("material", m_filePath, "Unable to find closing brace!");
 					continue;
 				}
 
@@ -201,7 +201,7 @@ bool Material::load(String filePath)
 				{
 					if (values.size() > 4)
 					{
-						error("material", m_filePath, "Too many values in the attribute!");
+						warning("material", m_filePath, "Too many values in the attribute!");
 						continue;
 					}
 					attrib.m_valueType = Attribute::FLOAT;
@@ -225,7 +225,7 @@ bool Material::load(String filePath)
 	{
 		if (!tex.load())
 		{
-			error("material", m_filePath, "Error in material!");
+			warning("material", m_filePath, "Error in material!");
 		}
 	}
 
@@ -290,6 +290,49 @@ String Material::toDeclaration(const String &prefix) const
 	}
 	result += prefix + "}\n";
 	return result;
+}
+
+Pix::Value Material::toPixDefinition() const
+{
+	Pix::Value root;
+	root["Alias"] = alias();
+	root["Effect"] = m_effect;
+	root["Flags"] = 0;
+	root["AttributeCount"] = m_attributes.size();
+	root["TextureCount"] = m_textures.size();
+
+	for (size_t i = 0; i < m_attributes.size(); ++i)
+	{
+		const Attribute *const attr = &m_attributes[i];
+		Pix::Value &attribute = root["Attribute"];
+		attribute["Format"] = Pix::Value::Enumeration(attr->getFormat());
+		attribute["Tag"] = attr->m_name;
+		if (attr->m_valueType == Attribute::FLOAT)
+		{
+			attribute["Value"] = Pix::Value(attr->m_value, attr->m_valueCount);
+		}
+		else
+		{
+			attribute["Value"] = Pix::Value::Enumeration("( \"" + attr->m_stringValue + "\" )");
+		}
+	}
+
+	for (size_t i = 0; i < m_textures.size(); ++i)
+	{
+		const Texture *const tex = &m_textures[i];
+		Pix::Value &texture = root["Texture"];
+		texture["Tag"] = fmt::sprintf("texture[%i]:%s", (int)i, tex->m_textureName);
+		texture["Value"] = tex->m_texture.substr(0, tex->m_texture.length() - 5); // -5 -> .tobj removing
+	}
+	return root;
+}
+
+Pix::Value Material::toPixDeclaration() const
+{
+	Pix::Value root;
+	root["Alias"] = alias();
+	root["Effect"] = m_effect;
+	return root;
 }
 
 String Material::alias() const

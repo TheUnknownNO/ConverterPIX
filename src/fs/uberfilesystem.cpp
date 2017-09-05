@@ -21,11 +21,21 @@ UberFileSystem::~UberFileSystem()
 {
 }
 
+String UberFileSystem::root() const
+{
+	return "/";
+}
+
+String UberFileSystem::name() const
+{
+	return "uberfs";
+}
+
 UniquePtr<File> UberFileSystem::open(const String &filename, FsOpenMode mode)
 {
 	for (auto it = m_filesystems.rbegin(); it != m_filesystems.rend(); ++it)
 	{
-		auto file = (*it).second->open(filename, mode);
+		UniquePtr<File> file = (*it).second->open(filename, mode);
 		if (file)
 		{
 			return file;
@@ -64,21 +74,44 @@ bool UberFileSystem::dirExists(const String &dirpath)
 	return false;
 }
 
-UniquePtr<List<String>> UberFileSystem::readDir(const String &path, bool absolutePaths, bool recursive)
+auto UberFileSystem::readDir(const String &path, bool absolutePaths, bool recursive) -> UniquePtr<List<Entry>>
 {
-	auto result = std::make_unique<List<String>>();
-	for (const auto &fs : m_filesystems)
+	UniquePtr<List<Entry>> result;
+	for (auto it = m_filesystems.rbegin(); it != m_filesystems.rend(); ++it)
 	{
-		auto current = fs.second->readDir(path, absolutePaths, recursive);
-		if (current)
+		const auto &fs = (*it);
+		if(fs.second->dirExists(path))
 		{
-			result->insert(result->begin(), current->begin(), current->end());
+			auto current = fs.second->readDir(path, absolutePaths, recursive);
+			if (current)
+			{
+				if (!result)
+				{
+					result = std::make_unique<List<Entry>>();
+				}
+				for (const auto &c : (*current))
+				{
+					bool existsAlready = false;
+					for (const auto &r : (*result))
+					{
+						if (c.GetPath() == r.GetPath())
+						{
+							existsAlready = true;
+							break;
+						}
+					}
+					if (!existsAlready)
+					{
+						result->push_back(c);
+					}
+				}
+			}
 		}
 	}
 	return result;
 }
 
-FileSystem *UberFileSystem::mount(UniquePtr<FileSystem> fs, int priority)
+FileSystem *UberFileSystem::mount(UniquePtr<FileSystem> fs, Priority priority)
 {
 	m_filesystems[priority] = std::move(fs);
 	return m_filesystems[priority].get();

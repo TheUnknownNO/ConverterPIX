@@ -12,6 +12,8 @@
 class FileSystem
 {
 public:
+	class Entry;
+
 	enum FsOpenMode
 	{
 		OpenModeNone = 0
@@ -31,23 +33,49 @@ public:
 	FileSystem &operator=(FileSystem &) = delete;
 	FileSystem &operator=(FileSystem &&) = delete;
 
+	virtual String root() const = 0;
+	virtual String name() const = 0;
 	virtual UniquePtr<File> open(const String &filename, FsOpenMode mode) = 0;
 	virtual bool mkdir(const String &directory) = 0;
 	virtual bool rmdir(const String &directory) = 0;
 	virtual bool exists(const String &filename) = 0;
 	virtual bool dirExists(const String &dirpath) = 0;
-	virtual UniquePtr<List<String>> readDir(const String &path, bool absolutePaths, bool recursive) = 0;
+	virtual UniquePtr<List<Entry>> readDir(const String &path, bool absolutePaths, bool recursive) = 0;
+};
+
+class FileSystem::Entry
+{
+public:
+	Entry()
+	{
+	}
+
+	Entry(String path, bool directory, bool encrypted, FileSystem *filesystem)
+		: m_path(path)
+		, m_directory(directory)
+		, m_encrypted(encrypted)
+		, m_filesystem(filesystem)
+	{
+	}
+
+	inline const String &GetPath() const { return m_path; }
+	inline void SetPath(const String path) { m_path = path; }
+
+	inline bool IsDirectory() const { return m_directory; }
+	inline bool IsEncrypted() const { return m_encrypted; }
+	inline FileSystem *GetFileSystem() const { return m_filesystem; }
+
+private:
+	String m_path;
+	bool m_directory = false;
+	bool m_encrypted = false;
+	FileSystem *m_filesystem = nullptr;
 };
 
 constexpr FileSystem::FsOpenMode operator|(const FileSystem::FsOpenMode t, const FileSystem::FsOpenMode f)
 {
 	return static_cast<FileSystem::FsOpenMode>((unsigned)t | (unsigned)f);
 }
-
-class HashFileSystem : public FileSystem
-{
-	/* TODO: Implement */
-};
 
 SysFileSystem *getSFS();
 UberFileSystem *getUFS();

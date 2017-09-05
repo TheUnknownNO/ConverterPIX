@@ -13,20 +13,23 @@
 
 class SysFileSystem : public FileSystem
 {
-private:
-	String m_root; // does not contain / at end
 public:
 	SysFileSystem(const String &root);
 	virtual ~SysFileSystem();
 
+	virtual String root() const override;
+	virtual String name() const override;
 	virtual UniquePtr<File> open(const String &filename, FsOpenMode mode) override;
 	virtual bool mkdir(const String &directory) override;
 	virtual bool rmdir(const String &directory) override;
 	virtual bool exists(const String &filename) override;
 	virtual bool dirExists(const String &dirpath) override;
-	virtual UniquePtr<List<String>> readDir(const String &path, bool absolutePaths, bool recursive) override;
+	virtual UniquePtr<List<Entry>> readDir(const String &path, bool absolutePaths, bool recursive) override;
 
 	String getError() const;
+
+private:
+	String m_root; // does not contain / at end
 };
 
 /* eof */

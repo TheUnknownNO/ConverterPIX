@@ -15,6 +15,7 @@
 #include <fs/uberfilesystem.h>
 #include <fs/sysfilesystem.h>
 
+#include <pix/pix.h>
 #include <resource_lib.h>
 #include <texture/texture.h>
 #include <prefab/prefab.h>
@@ -27,66 +28,31 @@
 
 using namespace prism;
 
-auto Variant::Part::operator[](String attribute) const -> const Attribute &
+Model::Model()
 {
-	const auto it = std::find_if(m_attributes.cbegin(), m_attributes.cend(),
-	[&](const Attribute &attr) {
-		return attr.getName() == attribute;
-	});
-	assert(it != m_attributes.cend());
-	return (*it);
 }
 
-auto Variant::Part::operator[](String attribute) -> Attribute &
+Model::~Model()
 {
-	auto it = std::find_if(m_attributes.begin(), m_attributes.end(),
-	[&](const Attribute &attr) {
-		return attr.getName() == attribute;
-	});
-	assert(it != m_attributes.end());
-	return (*it);
 }
 
-auto Variant::Part::operator[](size_t attribute) const -> const Attribute &
+bool Model::load(String filePath)
 {
-	assert(attribute < m_attributes.size());
-	return m_attributes[attribute];
-}
+	if (m_loaded)
+		destroy();
 
-auto Variant::Part::operator[](size_t attribute) -> Attribute &
-{
-	assert(attribute < m_attributes.size());
-	return m_attributes[attribute];
-}
+	m_filePath = filePath;
+	m_directory = directory(filePath);
+	m_fileName = filePath.substr(m_directory.length() + 1);
 
-void Variant::setPartCount(size_t parts)
-{
-	m_parts.resize(parts);
-}
+	if (!loadDescriptor()) return false;
+	if (!loadModel()) return false;
 
-auto Variant::operator[](size_t id) const -> const Part &
-{
-	assert(id >= 0 && id < m_parts.size());
-	return m_parts[id];
-}
+	loadPrefab();
+	loadCollision();
 
-auto Variant::operator[](size_t id) -> Part &
-{
-	assert(id >= 0 && id < m_parts.size());
-	return m_parts[id];
-}
-
-String Variant::Attribute::toDefinition(const String &prefix) const
-{
-	String result;
-	result += prefix + "Attribute {" SEOL;
-	{
-		result += prefix + fmt::sprintf(TAB "Format: %s" SEOL, m_type == INT ? "INT" : "UNKNOWN");
-		result += prefix + fmt::sprintf(TAB "Tag: \"%s\"" SEOL, m_name.c_str());
-		result += prefix + fmt::sprintf(TAB "Value: ( %i )" SEOL, m_intValue);
-	}
-	result += prefix + "}" SEOL;
-	return result;
+	m_loaded = true;
+	return true;
 }
 
 void Model::destroy()
@@ -108,33 +74,6 @@ void Model::destroy()
 	m_fileName = "";
 }
 
-bool Model::load(String filePath)
-{
-	if (m_loaded)
-		destroy();
-
-	m_filePath = filePath;
-	m_directory = directory(filePath);
-	m_fileName = filePath.substr(m_directory.length() + 1);
-
-	if (!loadDescriptor()) return false;
-	if (!loadModel()) return false;
-
-	if (getUFS()->exists(m_filePath + ".ppd"))
-	{
-		m_prefab = std::make_shared<Prefab>();
-		if (!m_prefab->load(filePath))
-		{
-			m_prefab.reset();
-		}
-	}
-
-	loadCollision();
-	
-	m_loaded = true;
-	return true;
-}
-
 bool Model::loadModel()
 {
 	String pmgPath = m_filePath + ".pmg";
@@ -145,7 +84,7 @@ bool Model::loadModel()
 		return false;
 	}
 
-	const size_t fileSize = file->getSize();
+	const size_t fileSize = file->size();
 	UniquePtr<uint8_t[]> buffer(new uint8_t[fileSize]);
 	file->read((char *)buffer.get(), sizeof(char), fileSize);
 	file.reset();
@@ -179,7 +118,6 @@ bool Model::loadModel0x13(const uint8_t *const buffer, const size_t size)
 	m_pieces.resize(header->m_piece_count);
 	m_bones.resize(header->m_bone_count);
 	m_locators.resize(header->m_locator_count);
-	m_parts.resize(header->m_part_count);
 
 	auto bone = (const pmg_bone_t *)(buffer + header->m_bone_offset);
 	for (int32_t i = 0; i < header->m_bone_count; ++i, ++bone)
@@ -260,7 +198,7 @@ bool Model::loadModel0x13(const uint8_t *const buffer, const size_t size)
 
 		if (piece->m_bone_count > Vertex::BONE_COUNT)
 		{
-			error_f("model", m_filePath,
+			warning_f("model", m_filePath,
 					"Bone count in piece: %i exceeds maximum bone count (%i/%i)! "
 					"To fix it increase Vertex::BONE_COUNT constant, and recompile software.",
 					i, piece->m_bone_count, Vertex::BONE_COUNT);
@@ -382,9 +320,9 @@ bool Model::loadModel0x13(const uint8_t *const buffer, const size_t size)
 		auto triangle = (const pmg_triangle_t *)(buffer + piece->m_triangle_offset);
 		for (int32_t j = 0; j < (piece->m_edges / 3); ++j, ++triangle)
 		{
-			currentPiece->m_triangles[j].m_a[0] = triangle->a[0];
-			currentPiece->m_triangles[j].m_a[1] = triangle->a[1];
-			currentPiece->m_triangles[j].m_a[2] = triangle->a[2];
+			currentPiece->m_triangles[j].m_attach[0] = triangle->a[0];
+			currentPiece->m_triangles[j].m_attach[1] = triangle->a[1];
+			currentPiece->m_triangles[j].m_attach[2] = triangle->a[2];
 		}
 	}
 	return true;
@@ -599,9 +537,9 @@ bool Model::loadModel0x14(const uint8_t *const buffer, const size_t size)
 		auto triangle = (const pmg_index_t *)(buffer + piece->m_index_offset);
 		for (int32_t j = 0; j < (piece->m_edges / 3); ++j, ++triangle)
 		{
-			currentPiece->m_triangles[j].m_a[0] = triangle->a[0];
-			currentPiece->m_triangles[j].m_a[1] = triangle->a[1];
-			currentPiece->m_triangles[j].m_a[2] = triangle->a[2];
+			currentPiece->m_triangles[j].m_attach[0] = triangle->a[0];
+			currentPiece->m_triangles[j].m_attach[1] = triangle->a[1];
+			currentPiece->m_triangles[j].m_attach[2] = triangle->a[2];
 		}
 	}
 	return true;
@@ -610,7 +548,7 @@ bool Model::loadModel0x14(const uint8_t *const buffer, const size_t size)
 bool Model::loadDescriptor()
 {
 	const String pmdPath = m_filePath + ".pmd";
-	
+
 	auto file = getUFS()->open(pmdPath, FileSystem::read | FileSystem::binary);
 	if(!file)
 	{
@@ -618,7 +556,7 @@ bool Model::loadDescriptor()
 		return false;
 	}
 
-	size_t fileSize = file->getSize();
+	size_t fileSize = file->size();
 	UniquePtr<uint8_t[]> buffer(new uint8_t[fileSize]);
 	file->read((char *)buffer.get(), sizeof(uint8_t), fileSize);
 	file.reset();
@@ -638,7 +576,7 @@ bool Model::loadDescriptor()
 
 	m_materialCount = header->m_material_count;
 	m_looks.resize(header->m_look_count);
-	
+
 	for (uint32_t i = 0; i < m_looks.size(); ++i)
 	{
 		Look *currentLook = &m_looks[i];
@@ -677,6 +615,7 @@ bool Model::loadDescriptor()
 		}
 	}
 
+	m_parts.resize(header->m_part_count);
 	m_variants.resize(header->m_variant_count);
 
 	for (uint32_t i = 0; i < m_variants.size(); ++i)
@@ -686,7 +625,7 @@ bool Model::loadDescriptor()
 
 		variant->m_name = variantName.to_string();
 		variant->setPartCount(header->m_part_count);
-	
+
 		for (uint32_t j = 0; j < header->m_part_count; ++j)
 		{
 			(*variant)[j].m_part = &m_parts[j];
@@ -704,7 +643,7 @@ bool Model::loadDescriptor()
 						attrib.m_intValue = attribValue->m_int_value;
 					} break;
 					// TODO: More attributes
-					default: error_f("model", m_filePath, "Invalid attribute type in descriptor (%i)!", attribDef->m_type);
+					default: warning_f("model", m_filePath, "Invalid attribute type in descriptor (%i)!", attribDef->m_type);
 				}
 				(*variant)[j].m_attributes.push_back(attrib);
 			}
@@ -713,12 +652,32 @@ bool Model::loadDescriptor()
 	return true;
 }
 
+bool Model::loadPrefab()
+{
+	if (getUFS()->exists(m_filePath + ".ppd"))
+	{
+		m_prefab = std::make_unique<Prefab>();
+		if (!m_prefab->load(m_filePath))
+		{
+			m_prefab.reset();
+			return false;
+		}
+		return true;
+	}
+	return false;
+}
+
 bool Model::loadCollision()
 {
 	if (getUFS()->exists(m_filePath + ".pmc"))
 	{
-		m_collision = std::make_shared<Collision>();
-		return m_collision->load(this, m_filePath);
+		m_collision = std::make_unique<Collision>();
+		if (!m_collision->load(this, m_filePath))
+		{
+			m_collision.reset();
+			return false;
+		}
+		return true;
 	}
 	return false;
 }
@@ -733,13 +692,208 @@ bool Model::saveToPim(String exportPath) const
 		return false;
 	}
 
+	//Pix::Value root;
+
+	//root.allocateNamedObjects( // optimization stuff
+	//	  1 // header
+	//	+ 1 // global
+	//	+ (m_looks.size() > 0 ? m_looks[0].m_materials.size() : 0)
+	//	+ m_pieces.size()
+	//	+ m_parts.size()
+	//	+ m_locators.size()
+	//	+ m_bones.size()
+	//	+ 1 // skin
+	//);
+
+	//Pix::Value &header = root["Header"];
+	//header["FormatVersion"] = 5;
+	//header["Source"] = STRING_VERSION;
+	//header["Type"] = "Model";
+	//header["Name"] = m_fileName;
+
+	//Pix::Value &global = root["Global"];
+	//global["VertexCount"] = m_vertCount;
+	//global["TriangleCount"] = m_triangleCount;
+	//global["MaterialCount"] = m_materialCount;
+	//global["PieceCount"] = m_pieces.size();
+	//global["PartCount"] = m_parts.size();
+	//global["BoneCount"] = m_bones.size();
+	//global["LocatorCount"] = m_locators.size();
+	//global["Skeleton"] = m_fileName + ".pis";
+
+	//if (m_looks.size() > 0)
+	//{
+	//	for (const auto &mat : m_looks[0].m_materials)
+	//	{
+	//		root["Material"] = mat.toPixDeclaration();
+	//	}
+	//}
+
+	//for (const auto &piece : m_pieces)
+	//{
+	//	Pix::Value &p = root["Piece"];
+	//	p["Index"] = piece.m_index;
+	//	p["Material"] = piece.m_material;
+	//	p["VertexCount"] = piece.m_vertices.size();
+	//	p["TriangleCount"] = piece.m_triangles.size();
+	//	p["StreamCount"] = piece.m_streamCount;
+	//	p.allocateNamedObjects(10); // optimization stuff
+
+	//	if (piece.m_position)
+	//	{
+	//		Pix::Value &stream = p["Stream"];
+	//		stream["Format"] = Pix::Value::Enumeration("FLOAT3");
+	//		stream["Tag"] = "_POSITION";
+	//		stream.allocateIndexedObjects(piece.m_vertices.size());
+	//		for (size_t i = 0; i < piece.m_vertices.size(); ++i)
+	//		{
+	//			stream[i] = piece.m_vertices[i].m_position;
+	//		}
+	//	}
+
+	//	if (piece.m_normal)
+	//	{
+	//		Pix::Value &stream = p["Stream"];
+	//		stream["Format"] = Pix::Value::Enumeration("FLOAT3");
+	//		stream["Tag"] = "_NORMAL";
+	//		stream.allocateIndexedObjects(piece.m_vertices.size());
+	//		for (size_t i = 0; i < piece.m_vertices.size(); ++i)
+	//		{
+	//			stream[i] = piece.m_vertices[i].m_normal;
+	//		}
+	//	}
+
+	//	if (piece.m_tangent)
+	//	{
+	//		Pix::Value &stream = p["Stream"];
+	//		stream["Format"] = Pix::Value::Enumeration("FLOAT3");
+	//		stream["Tag"] = "_TANGENT";
+	//		stream.allocateIndexedObjects(piece.m_vertices.size());
+	//		for (size_t i = 0; i < piece.m_vertices.size(); ++i)
+	//		{
+	//			stream[i] = piece.m_vertices[i].m_tangent;
+	//		}
+	//	}
+
+	//	if (piece.m_texcoord)
+	//	{
+	//		for (uint32_t texcoord = 0; texcoord < piece.m_texcoordCount; ++texcoord)
+	//		{
+	//			Pix::Value &stream = p["Stream"];
+	//			stream["Format"] = Pix::Value::Enumeration("FLOAT2");
+	//			stream["Tag"] = fmt::sprintf("_UV%i", texcoord);
+
+	//			Array<uint32_t> texCoords = piece.texCoords(texcoord);
+	//			stream["AliasCount"] = texCoords.size();
+
+	//			Array<String> texCoordsString;
+	//			for (const uint32_t &tex : texCoords)
+	//			{
+	//				texCoordsString.push_back(fmt::sprintf("_TEXCOORD%i", tex));
+	//			}
+	//			stream["Aliases"] = texCoordsString;
+
+	//			stream.allocateIndexedObjects(piece.m_vertices.size());
+	//			for (size_t i = 0; i < piece.m_vertices.size(); ++i)
+	//			{
+	//				stream[i] = piece.m_vertices[i].m_texcoords[texcoord];
+	//			}
+	//		}
+	//	}
+
+	//	if (piece.m_color)
+	//	{
+	//		Pix::Value &stream = p["Stream"];
+	//		stream["Format"] = Pix::Value::Enumeration("FLOAT4");
+	//		stream["Tag"] = "_RGBA";
+	//		stream.allocateIndexedObjects(piece.m_vertices.size());
+	//		for (size_t i = 0; i < piece.m_vertices.size(); ++i)
+	//		{
+	//			stream[i] = piece.m_vertices[i].m_color;
+	//		}
+	//	}
+
+	//	Pix::Value &triangles = p["Triangles"];
+	//	triangles.allocateIndexedObjects(piece.m_triangles.size());
+	//	for (size_t i = 0; i < piece.m_triangles.size(); ++i)
+	//	{
+	//		triangles[i] = piece.m_triangles[i].m_attach;
+	//	}
+	//}
+
+	//for (const auto &part : m_parts)
+	//{
+	//	Pix::Value &p = root["Part"];
+	//	p["Name"] = part.m_name;
+	//	p["PieceCount"] = part.m_pieceCount;
+	//	p["LocatorCount"] = part.m_locatorCount;
+
+	//	Array<int> pieces;
+	//	for (uint32_t i = 0; i < part.m_pieceCount; ++i)
+	//	{
+	//		pieces.push_back(part.m_pieceId + i);
+	//	}
+	//	p["Pieces"] = pieces;
+
+	//	Array<int> locators;
+	//	for (uint32_t i = 0; i < part.m_locatorCount; ++i)
+	//	{
+	//		locators.push_back(part.m_locatorId + i);
+	//	}
+	//	p["Locators"] = locators;
+	//}
+
+	//for (const auto &locator : m_locators)
+	//{
+	//	Pix::Value &l = root["Locator"];
+	//	l["Name"] = locator.m_name;
+	//	if (!locator.m_hookup.empty())
+	//	{
+	//		l["Hookup"] = locator.m_hookup;
+	//	}
+	//	l["Index"] = locator.m_index;
+	//	l["Position"] = locator.m_position;
+	//	l["Rotation"] = locator.m_rotation;
+	//	l["Scale"] = locator.m_scale;
+	//}
+
+	//if (!m_bones.empty())
+	//{
+	//	Pix::Value &bones = root["Bones"];
+	//	bones.allocateIndexedObjects(m_bones.size());
+	//	for (size_t i = 0; i < m_bones.size(); ++i)
+	//	{
+	//		bones[i] = m_bones[i].m_name;
+	//	}
+	//}
+
+	//if (m_skinVertCount > 0)
+	//{
+	//	Pix::Value &skin = root["Skin"];
+	//	skin["StreamCount"] = 1;
+	//	Pix::Value &skinStream = skin["SkinStream"];
+	//	skinStream["Format"] = Pix::Value::Enumeration("FLOAT3");
+	//	skinStream["Tag"] = "_POSITION";
+	//	skinStream["ItemCount"] = 1;
+	//	skinStream["TotalWeightCount"] = 1;
+	//	skinStream["TotalCloneCount"] = 1;
+	//	skinStream.allocateIndexedObjects(m_skinVertCount);
+	//	for (size_t i = 0; i < m_skinVertCount; ++i)
+	//	{
+	//		skinStream[i] =
+	//	}
+	//}
+
+	//Pix::StyledFileWriter writer;
+	//writer.write(file.get(), root);
+
 	*file << fmt::sprintf(
 		"Header {"							SEOL
 		TAB "FormatVersion: 5"				SEOL
 		TAB "Source: \"%s\""				SEOL
 		TAB "Type: \"Model\""				SEOL
 		TAB "Name: \"%s\""					SEOL
-		"}"									SEOL, 
+		"}"									SEOL,
 			STRING_VERSION,
 			m_fileName.c_str()
 		);
@@ -754,7 +908,7 @@ bool Model::saveToPim(String exportPath) const
 		TAB "BoneCount: %i"					SEOL
 		TAB "LocatorCount: %i"				SEOL
 		TAB "Skeleton: \"%s\""				SEOL
-		"}"									SEOL, 
+		"}"									SEOL,
 			m_vertCount,
 			m_triangleCount,
 			m_materialCount,
@@ -797,7 +951,7 @@ bool Model::saveToPim(String exportPath) const
 				TAB "Stream {"				SEOL
 				TAB TAB "Format: %s"		SEOL
 				TAB TAB "Tag: \"%s\""		SEOL,
-					"FLOAT3", 
+					"FLOAT3",
 					"_POSITION"
 				);
 
@@ -840,7 +994,7 @@ bool Model::saveToPim(String exportPath) const
 					"FLOAT4",
 					"_TANGENT"
 				);
-			
+
 			for (uint32_t j = 0; j < currentPiece->m_vertices.size(); ++j)
 			{
 				*file << fmt::sprintf(
@@ -889,8 +1043,8 @@ bool Model::saveToPim(String exportPath) const
 			*file << fmt::sprintf(
 				TAB "Stream {" SEOL
 				TAB TAB "Format: %s" SEOL
-				TAB TAB "Tag: \"%s\"" SEOL, 
-					"FLOAT4", 
+				TAB TAB "Tag: \"%s\"" SEOL,
+					"FLOAT4",
 					"_RGBA"
 				);
 
@@ -915,7 +1069,9 @@ bool Model::saveToPim(String exportPath) const
 			{
 				*file << fmt::sprintf(
 					TAB TAB "%-5i( %-5i %-5i %-5i )" SEOL,
-						j, currentPiece->m_triangles[j].m_a[0], currentPiece->m_triangles[j].m_a[1], currentPiece->m_triangles[j].m_a[2]
+						j, currentPiece->m_triangles[j].m_attach[0],
+						   currentPiece->m_triangles[j].m_attach[1],
+						   currentPiece->m_triangles[j].m_attach[2]
 					);
 			}
 
@@ -932,9 +1088,9 @@ bool Model::saveToPim(String exportPath) const
 			"Part {" SEOL
 			TAB "Name: \"%s\"" SEOL
 			TAB "PieceCount: %i" SEOL
-			TAB "LocatorCount: %i" SEOL, 
-				currentPart->m_name.c_str(), 
-				currentPart->m_pieceCount, 
+			TAB "LocatorCount: %i" SEOL,
+				currentPart->m_name.c_str(),
+				currentPart->m_pieceCount,
 				currentPart->m_locatorCount
 			);
 
@@ -1094,76 +1250,49 @@ bool Model::saveToPit(String exportPath) const
 		return false;
 	}
 
-	*file << fmt::sprintf(
-		"Header {"					SEOL
-		TAB "FormatVersion: 1"		SEOL
-		TAB "Source: \"%s\""		SEOL
-		TAB "Type: \"Trait\""		SEOL
-		TAB "Name: \"%s\""			SEOL
-		"}"							SEOL,
-			STRING_VERSION,
-			m_fileName.c_str()
-		);
+	Pix::Value root;
 
-	*file << fmt::sprintf(
-		"Global {"					SEOL
-		TAB "LookCount: %i"			SEOL
-		TAB "VariantCount: %i"		SEOL
-		TAB "PartCount: %i"			SEOL
-		TAB "MaterialCount: %i"		SEOL
-		"}"							SEOL,
-			(int)m_looks.size(),
-			(int)m_variants.size(),
-			(int)m_parts.size(),
-			m_materialCount
-		);
+	Pix::Value &header = root["Header"];
+	header["FormatVersion"] = 1;
+	header["Source"] = STRING_VERSION;
+	header["Type"] = "Trait";
+	header["Name"] = m_fileName;
 
-	for (uint32_t i = 0; i < m_looks.size(); ++i)
+	Pix::Value &global = root["Global"];
+	global["LookCount"] = m_looks.size();
+	global["VariantCount"] = m_variants.size();
+	global["PartCount"] = m_parts.size();
+	global["MaterialCount"] = m_materialCount;
+
+	for (const auto &l : m_looks)
 	{
-		*file << fmt::sprintf(
-			"Look {"				SEOL
-			TAB "Name: \"%s\""		SEOL,
-				m_looks[i].m_name.c_str()
-			);
-
-		for (uint32_t j = 0; j < (uint32_t)m_looks[i].m_materials.size(); ++j)
+		Pix::Value &look = root["Look"];
+		look["Name"] = l.m_name;
+		for (const auto &mat : l.m_materials)
 		{
-			*file << m_looks[i].m_materials[j].toDefinition(TAB);
+			look["Material"] = mat.toPixDefinition();
 		}
-
-		*file << "}"				SEOL;
 	}
 
-	for (uint32_t i = 0; i < m_variants.size(); ++i)
+	for (const auto &v : m_variants)
 	{
-		*file << fmt::sprintf(
-			"Variant {"				SEOL
-			TAB "Name: \"%s\""		SEOL,
-				m_variants[i].m_name.c_str()
-			);
-
-		for (uint32_t j = 0; j < m_parts.size(); ++j)
+		Pix::Value &variant = root["Variant"];
+		variant["Name"] = v.m_name;
+		for (uint32_t i = 0; i < m_parts.size(); ++i)
 		{
-			*file << fmt::sprintf(
-				TAB "Part {"		SEOL
-				TAB TAB "Name: \"%s\""			SEOL
-				TAB TAB "AttributeCount: %i"	SEOL,
-					m_parts[j].m_name.c_str(),
-					m_variants[i].m_parts[j].m_attributes.size()
-				);
-
-			for (uint32_t k = 0; k < m_variants[i].m_parts[j].m_attributes.size(); ++k)
+			Pix::Value &part = variant["Part"];
+			part["Name"] = m_parts[i].m_name;
+			part["AttributeCount"] = v.m_parts[i].m_attributes.size();
+			for (uint32_t k = 0; k < v.m_parts[i].m_attributes.size(); ++k)
 			{
-				*file << m_variants[i].m_parts[j][k].toDefinition(TAB TAB);
+				part["Attribute"] = v.m_parts[i][k].toPixDefinition();
 			}
-
-			*file << TAB "}"		SEOL;
 		}
-
-		*file << "}"				SEOL;
 	}
 
-	file.reset();
+	Pix::StyledFileWriter writer;
+	writer.write(file.get(), root);
+	file->flush();
 	return true;
 }
 
@@ -1255,6 +1384,77 @@ Bone *Model::bone(size_t index)
 {
 	assert(index >= 0 && index < m_bones.size());
 	return &m_bones[index];
+}
+
+auto Variant::Part::operator[](String attribute) const -> const Attribute &
+{
+	const auto it = std::find_if(m_attributes.cbegin(), m_attributes.cend(),
+	[&](const Attribute &attr) {
+		return attr.getName() == attribute;
+	});
+	assert(it != m_attributes.cend());
+	return (*it);
+}
+
+auto Variant::Part::operator[](String attribute) -> Attribute &
+{
+	auto it = std::find_if(m_attributes.begin(), m_attributes.end(),
+	[&](const Attribute &attr) {
+		return attr.getName() == attribute;
+	});
+	assert(it != m_attributes.end());
+	return (*it);
+}
+
+auto Variant::Part::operator[](size_t attribute) const -> const Attribute &
+{
+	assert(attribute < m_attributes.size());
+	return m_attributes[attribute];
+}
+
+auto Variant::Part::operator[](size_t attribute) -> Attribute &
+{
+	assert(attribute < m_attributes.size());
+	return m_attributes[attribute];
+}
+
+void Variant::setPartCount(size_t parts)
+{
+	m_parts.resize(parts);
+}
+
+auto Variant::operator[](size_t id) const -> const Part &
+{
+	assert(id >= 0 && id < m_parts.size());
+	return m_parts[id];
+}
+
+auto Variant::operator[](size_t id) -> Part &
+{
+	assert(id >= 0 && id < m_parts.size());
+	return m_parts[id];
+}
+
+String Variant::Attribute::toDefinition(const String &prefix) const
+{
+	String result;
+	result += prefix + "Attribute {" SEOL;
+	{
+		result += prefix + fmt::sprintf(TAB "Format: %s" SEOL, m_type == INT ? "INT" : "UNKNOWN");
+		result += prefix + fmt::sprintf(TAB "Tag: \"%s\"" SEOL, m_name.c_str());
+		result += prefix + fmt::sprintf(TAB "Value: ( %i )" SEOL, m_intValue);
+	}
+	result += prefix + "}" SEOL;
+	return result;
+}
+
+Pix::Value Variant::Attribute::toPixDefinition() const
+{
+	Pix::Value root;
+	root["Format"] = Pix::Value::Enumeration(m_type == INT ? "INT" : "UNKNOWN");
+	root["Tag"] = m_name;
+	root["Value"] = prism::vec_t<int, 1>(m_intValue);
+	return root;
 }
 
 /* eof */
