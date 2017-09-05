@@ -129,4 +129,9 @@ void UberFileSystem::unmount(FileSystem *filesystem)
 	}
 }
 
+FileSystem *UberFileSystem::get(int priority)
+{
+	return m_filesystems[priority].get();
+}
+
 /* eof */

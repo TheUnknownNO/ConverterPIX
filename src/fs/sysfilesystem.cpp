@@ -85,7 +85,7 @@ bool SysFileSystem::mkdir(const String &dir)
 		if (!dirExists(dirr.substr(0, pos).c_str()))
 		{
 		#ifdef _WIN32
-			if (::mkdir(dirr.substr(0, pos).c_str()) != 0)
+			if (::_mkdir(dirr.substr(0, pos).c_str()) != 0)
 				return false;
 		#else
 			if (::mkdir(dirr.substr(0, pos).c_str(), 0775) != 0)

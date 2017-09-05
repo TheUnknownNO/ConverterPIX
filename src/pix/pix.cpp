@@ -1,11 +1,11 @@
 /*********************************************************************
- *           Copyright (C) 2017 mwl4 - All rights reserved           *
- *********************************************************************
- * File       : pix.cpp
- * Project    : ConverterPIX
- * Developers : Michal Wojtowicz (mwl450@gmail.com)
- 			  : Piotr Krupa (piotrkrupa06@gmail.com)
- *********************************************************************/
+*           Copyright (C) 2017 mwl4 - All rights reserved           *
+*********************************************************************
+* File       : pix.cpp
+* Project    : ConverterPIX
+* Developers : Michal Wojtowicz (mwl450@gmail.com)
+: Piotr Krupa (piotrkrupa06@gmail.com)
+*********************************************************************/
 
 #include <prerequisites.h>
 
@@ -84,30 +84,30 @@ Value::Value(const Value &rhs)
 	m_type = rhs.m_type;
 	switch (m_type)
 	{
-		case Type::Null:
-		case Type::Int:
-		case Type::UInt:
-		case Type::Double:
-		case Type::Float:
-		case Type::FloatMatrix:
-		case Type::Boolean:
-			m_values = rhs.m_values;
-			break;
-		case Type::String:
-		case Type::Enum:
-			for (const auto &value : rhs.m_values)
-			{
-				ValueHolder valueHolder;
-				valueHolder.m_valueCount = 1;
-				valueHolder.m_string = value.m_string;
-				m_values.push_back(valueHolder);
-			}
-			break;
-		case Type::Object:
-			m_objects = rhs.m_objects;
+	case Type::Null:
+	case Type::Int:
+	case Type::UInt:
+	case Type::Double:
+	case Type::Float:
+	case Type::FloatMatrix:
+	case Type::Boolean:
+		m_values = rhs.m_values;
 		break;
-		default:
-			assert(false); // Unreachable assert
+	case Type::String:
+	case Type::Enum:
+		for (const auto &value : rhs.m_values)
+		{
+			ValueHolder valueHolder;
+			valueHolder.m_valueCount = 1;
+			valueHolder.m_string = value.m_string;
+			m_values.push_back(valueHolder);
+		}
+		break;
+	case Type::Object:
+		m_objects = rhs.m_objects;
+		break;
+	default:
+		assert(false); // Unreachable assert
 	}
 }
 
@@ -120,30 +120,30 @@ Value &Value::operator=(const Value &rhs)
 	m_type = rhs.m_type;
 	switch (m_type)
 	{
-		case Type::Null:
-		case Type::Int:
-		case Type::UInt:
-		case Type::Double:
-		case Type::Float:
-		case Type::FloatMatrix:
-		case Type::Boolean:
-			m_values = rhs.m_values;
-			break;
-		case Type::String:
-		case Type::Enum:
-			for (const auto &value : rhs.m_values)
-			{
-				ValueHolder valueHolder;
-				valueHolder.m_valueCount = 1;
-				valueHolder.m_string = value.m_string;
-				m_values.push_back(valueHolder);
-			}
-			break;
-		case Type::Object:
-			m_objects = rhs.m_objects;
+	case Type::Null:
+	case Type::Int:
+	case Type::UInt:
+	case Type::Double:
+	case Type::Float:
+	case Type::FloatMatrix:
+	case Type::Boolean:
+		m_values = rhs.m_values;
 		break;
-		default:
-			assert(false); // Unreachable assert
+	case Type::String:
+	case Type::Enum:
+		for (const auto &value : rhs.m_values)
+		{
+			ValueHolder valueHolder;
+			valueHolder.m_valueCount = 1;
+			valueHolder.m_string = value.m_string;
+			m_values.push_back(valueHolder);
+		}
+		break;
+	case Type::Object:
+		m_objects = rhs.m_objects;
+		break;
+	default:
+		assert(false); // Unreachable assert
 	}
 	return (*this);
 }
@@ -199,105 +199,105 @@ void StyledWriter::writeValue(const Value &value)
 {
 	switch (value.type())
 	{
-		case Value::Type::Null:
-			push("null");
-			break;
-		case Value::Type::Int:
-			for (const auto &v : value.m_values)
+	case Value::Type::Null:
+		push("null");
+		break;
+	case Value::Type::Int:
+		for (const auto &v : value.m_values)
+		{
+			push(toString(v.m_int, v.m_valueCount));
+			if (&v != &value.m_values.back())
 			{
-				push(toString(v.m_int, v.m_valueCount));
-				if (&v != &value.m_values.back())
-				{
-					push(" ");
-				}
+				push(" ");
 			}
-			break;
-		case Value::Type::UInt:
-			for (const auto &v : value.m_values)
+		}
+		break;
+	case Value::Type::UInt:
+		for (const auto &v : value.m_values)
+		{
+			push(std::to_string(v.m_uint[0]));
+			if (&v != &value.m_values.back())
 			{
-				push(std::to_string(v.m_uint[0]));
-				if (&v != &value.m_values.back())
-				{
-					push(" ");
-				}
+				push(" ");
 			}
-			break;
-		case Value::Type::Float:
-			for (const auto &v : value.m_values)
+		}
+		break;
+	case Value::Type::Float:
+		for (const auto &v : value.m_values)
+		{
+			push(toString(v.m_float, v.m_valueCount));
+			if (&v != &value.m_values.back())
 			{
-				push(toString(v.m_float, v.m_valueCount));
-				if (&v != &value.m_values.back())
-				{
-					push(" ");
-				}
+				push(" ");
 			}
-			break;
-		case Value::Type::FloatMatrix:
-			for (size_t i = 0; i < value.m_values[0].m_valueCount; ++i)
+		}
+		break;
+	case Value::Type::FloatMatrix:
+		for (size_t i = 0; i < value.m_values[0].m_valueCount; ++i)
+		{
+			for (size_t j = 0; j < value.m_values[0].m_valueCount; ++j)
 			{
-				for (size_t j = 0; j < value.m_values[0].m_valueCount; ++j)
-				{
-					push(((j != 0 ? "  " : "") + fmt::sprintf(FLT_FT, flh(value.m_values[0].m_float4x4[i][j]))));
-				}
-				if (i != (value.m_values[0].m_valueCount - 1))
-				{
-					push(m_defaultNewLine + m_indent + String(7, ' '));
-				}
+				push(((j != 0 ? "  " : "") + fmt::sprintf(FLT_FT, flh(value.m_values[0].m_float4x4[i][j]))));
 			}
-			break;
-		case Value::Type::Double:
-			for (const auto &v : value.m_values)
+			if (i != (value.m_values[0].m_valueCount - 1))
 			{
-				push(toString(v.m_double, v.m_valueCount));
-				if (&v != &value.m_values.back())
-				{
-					push(" ");
-				}
+				push(m_defaultNewLine + m_indent + String(7, ' '));
 			}
-			break;
-		case Value::Type::String:
-			for (const auto &v : value.m_values)
+		}
+		break;
+	case Value::Type::Double:
+		for (const auto &v : value.m_values)
+		{
+			push(toString(v.m_double, v.m_valueCount));
+			if (&v != &value.m_values.back())
 			{
-				push(valueToQuotedString(v.m_string));
-				if (&v != &value.m_values.back())
-				{
-					push(" ");
-				}
+				push(" ");
 			}
-			break;
-		case Value::Type::Enum:
-			push(value.m_values[0].m_string);
-			break;
-		case Value::Type::Object:
-			indent();
-			for (auto it = value.m_objects.m_named.cbegin(); it != value.m_objects.m_named.cend(); ++it)
+		}
+		break;
+	case Value::Type::String:
+		for (const auto &v : value.m_values)
+		{
+			push(valueToQuotedString(v.m_string));
+			if (&v != &value.m_values.back())
 			{
-				const auto &object = *it;
-				const bool header = object.m_value.m_type == Value::Type::Object;
-				const bool parentheses = object.m_value.m_values.size() != 0 ? object.m_value.m_values[0].m_parentheses : false;
-				writeWithIndent(object.m_name);
-				push(header ? (" {" + m_defaultNewLine) : ": ");
-				push(parentheses ? "( " : "");
-				writeValue(object.m_value);
-				push(parentheses ? " )" : "");
-				if(header)
-				{
-					writeWithIndent("}");
-				}
-				push(m_defaultNewLine);
+				push(" ");
 			}
-			for (size_t i = 0; i < value.m_objects.m_indexed.size(); ++i)
+		}
+		break;
+	case Value::Type::Enum:
+		push(value.m_values[0].m_string);
+		break;
+	case Value::Type::Object:
+		indent();
+		for (auto it = value.m_objects.m_named.cbegin(); it != value.m_objects.m_named.cend(); ++it)
+		{
+			const auto &object = *it;
+			const bool header = object.m_value.m_type == Value::Type::Object;
+			const bool parentheses = object.m_value.m_values.size() != 0 ? object.m_value.m_values[0].m_parentheses : false;
+			writeWithIndent(object.m_name);
+			push(header ? (" {" + m_defaultNewLine) : ": ");
+			push(parentheses ? "( " : "");
+			writeValue(object.m_value);
+			push(parentheses ? " )" : "");
+			if (header)
 			{
-				const auto &object = value.m_objects.m_indexed[i];
-				writeWithIndent(fmt::sprintf("%-5i", i));
-				push("( ");
-				writeValue(object);
-				push(" )" + m_defaultNewLine);
+				writeWithIndent("}");
 			}
-			unindent();
-			break;
-		default:
-			; // Unreachable
+			push(m_defaultNewLine);
+		}
+		for (size_t i = 0; i < value.m_objects.m_indexed.size(); ++i)
+		{
+			const auto &object = value.m_objects.m_indexed[i];
+			writeWithIndent(fmt::sprintf("%-5i", i));
+			push("( ");
+			writeValue(object);
+			push(" )" + m_defaultNewLine);
+		}
+		unindent();
+		break;
+	default:
+		; // Unreachable
 	}
 }
 

@@ -31,9 +31,10 @@ public:
 
 	FileSystem *mount(UniquePtr<FileSystem> fs, Priority priority);
 	void unmount(FileSystem *fs);
-
+	
 private:
 	std::map<Priority, UniquePtr<FileSystem>> m_filesystems;
+	FileSystem *get(int priority);
 };
 
 /* eof */
