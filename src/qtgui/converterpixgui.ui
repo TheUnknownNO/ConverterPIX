@@ -552,24 +552,11 @@
       <x>880</x>
       <y>80</y>
       <width>111</width>
-      <height>23</height>
+      <height>51</height>
      </rect>
     </property>
     <property name="text">
      <string>Convert all models</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="convert_all_btn">
-    <property name="geometry">
-     <rect>
-      <x>880</x>
-      <y>110</y>
-      <width>111</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Convert entire base</string>
     </property>
    </widget>
   </widget>

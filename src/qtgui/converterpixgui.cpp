@@ -31,7 +31,7 @@ ConverterPIXGUI::ConverterPIXGUI(QWidget *parent)
 	connect(ui.export_path_btn, SIGNAL(clicked()), this, SLOT(exportPathBtnClicked()));
 	connect(ui.export_path, SIGNAL(editingFinished()), this, SLOT(exportPathEdited()));
 	connect(ui.convert_btn, SIGNAL(clicked()), this, SLOT(convertClicked()));
-	connect(ui.convert_models_btn, SIGNAL(Clicked()), this, SLOT(convertAllModels()));
+	connect(ui.convert_models_btn, SIGNAL(clicked()), this, SLOT(convertAllModels()));
 
 	logger = new Logger(ui.model_paths_2);
 
@@ -291,7 +291,7 @@ void ConverterPIXGUI::convertClicked() {
 
 void ConverterPIXGUI::convertAllModels() {
 	if (ui.ufs_paths->count() == 0) {
-		QMessageBox::critical(this, "ConvertPIX - Critical Error", "No base paths added!");
+		QMessageBox::critical(this, "ConvertPIX - Critical Error", "No base paths added! convertallmodels");
 		return;
 	}
 
